@@ -39,8 +39,15 @@ import com.mayaswell.digident.CatalogAPI.CatalogItem;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Type;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Collection;
+
+import javax.crypto.Cipher;
+import javax.crypto.KeyGenerator;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -66,6 +73,7 @@ public class MainActivity extends AppCompatActivity {
 	private Button uploadButton;
 	private Bitmap ocrBitmap = null;
 	private String ocrText = "";
+	private boolean encryptCache = false;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -244,19 +252,6 @@ public class MainActivity extends AppCompatActivity {
 	}
 
 	/**
-	 * stores the cache of recently retreived items int the shared preferences
-	 */
-	private void saveItemCache() {
-		Collection<CatalogItem> recent = itemCache.getRecentList();
-		Gson gson = new GsonBuilder().registerTypeAdapter(Bitmap.class, new Base64ImageSerializer()).create();
-		String json = gson.toJson(recent);
-		SharedPreferences.Editor prefs = getPreferences(MODE_PRIVATE).edit();
-		prefs.putString("itemCache", json);
-		prefs.commit();
-	}
-
-
-	/**
 	 * standard callout to an external camera app
 	 */
 	static final int REQUEST_IMAGE_CAPTURE = 1;
@@ -300,6 +295,29 @@ public class MainActivity extends AppCompatActivity {
 	}
 
 	/**
+	 * stores the cache of recently retreived items int the shared preferences
+	 */
+	private void saveItemCache() {
+		Collection<CatalogItem> recent = itemCache.getRecentList();
+		Gson gson = new GsonBuilder().registerTypeAdapter(Bitmap.class, new Base64ImageSerializer()).create();
+		String json = gson.toJson(recent);
+		SharedPreferences.Editor prefs = getPreferences(MODE_PRIVATE).edit();
+		if (encryptCache) {
+			try {
+				prefs.putString("encryptedCache", new String(encrypt(getKey(), json.getBytes()), "UTF-8"));
+			} catch (NoSuchAlgorithmException e) {
+				prefs.putString("itemCache", json);
+			} catch (Exception e) {
+				prefs.putString("itemCache", json);
+			}
+		} else {
+			prefs.putString("itemCache", json);
+		}
+		prefs.commit();
+	}
+
+
+	/**
 	 * restores an item cache from the shared preferences
 	 * @return false if there is not usable data in the shared prefs
 	 */
@@ -308,7 +326,21 @@ public class MainActivity extends AppCompatActivity {
 		if (prefs == null) {
 			return false;
 		}
-		String json = prefs.getString("itemCache", null);
+		String json = null;
+		if (encryptCache) {
+			String jsone = prefs.getString("encryptedCache", null);
+			if (jsone != null) {
+				try {
+					json = new String(decrypt(getKey(), jsone.getBytes()), "UTF-8");
+				} catch (Exception e) {
+					json = prefs.getString("itemCache", null);
+				}
+			} else {
+				json = prefs.getString("itemCache", null);
+			}
+		} else {
+			json = prefs.getString("itemCache", null);
+		}
 		if (json == null) {
 			return false;
 		}
@@ -430,6 +462,11 @@ public class MainActivity extends AppCompatActivity {
 		}
 	};
 
+	/**
+	 * show an alert with the given title and message
+	 * @param title
+	 * @param message
+	 */
 	protected void showError(String title, String message) {
 		AlertDialog.Builder d = new AlertDialog.Builder(this);
 		d.setTitle(title);
@@ -442,5 +479,48 @@ public class MainActivity extends AppCompatActivity {
 		d.show();
 	}
 
+	/**
+	 * gets the key for encryption from a fixed seed
+	 * @return
+	 * @throws NoSuchAlgorithmException
+	 */
+	private static byte[] getKey() throws NoSuchAlgorithmException {
+		byte[] keyStart = "some key see or other".getBytes();
+		KeyGenerator kgen = KeyGenerator.getInstance("AES");
+		SecureRandom sr = SecureRandom.getInstance("SHA1PRNG");
+		sr.setSeed(keyStart);
+		kgen.init(128, sr); // 192 and 256 bits may not be available
+		SecretKey skey = kgen.generateKey();
+		return skey.getEncoded();
+	}
 
+	/**
+	 * aes256 encryption
+	 * @param key
+	 * @param clear
+	 * @return
+	 * @throws Exception
+	 */
+	private static byte[] encrypt(byte[] key, byte[] clear) throws Exception {
+		SecretKeySpec skeySpec = new SecretKeySpec(key, "AES");
+		Cipher cipher = Cipher.getInstance("AES");
+		cipher.init(Cipher.ENCRYPT_MODE, skeySpec);
+		byte[] encrypted = cipher.doFinal(clear);
+		return encrypted;
+	}
+
+	/**
+	 * aes256 decryption
+	 * @param key
+	 * @param encrypted
+	 * @return
+	 * @throws Exception
+	 */
+	private static byte[] decrypt(byte[] key, byte[] encrypted) throws Exception {
+		SecretKeySpec skeySpec = new SecretKeySpec(key, "AES");
+		Cipher cipher = Cipher.getInstance("AES");
+		cipher.init(Cipher.DECRYPT_MODE, skeySpec);
+		byte[] decrypted = cipher.doFinal(encrypted);
+		return decrypted;
+	}
 }
