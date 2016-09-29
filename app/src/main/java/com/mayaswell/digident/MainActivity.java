@@ -22,6 +22,7 @@ import android.view.Window;
 import android.view.animation.AlphaAnimation;
 import android.widget.Button;
 import android.widget.ImageView;
+import android.widget.ProgressBar;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.ViewAnimator;
@@ -74,6 +75,7 @@ public class MainActivity extends AppCompatActivity {
 	private Bitmap ocrBitmap = null;
 	private String ocrText = "";
 	private boolean encryptCache = false;
+	private ProgressBar progressBar;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -110,6 +112,8 @@ public class MainActivity extends AppCompatActivity {
 			}
 		});
 
+		progressBar = (ProgressBar) findViewById(R.id.progressBar);
+
 		uploadPanel = (RelativeLayout) findViewById(R.id.uploadPanel);
 		uploadImageView = (ImageView) findViewById(R.id.imageView);
 		uploadContentText = (TextView) findViewById(R.id.contentText);
@@ -119,18 +123,18 @@ public class MainActivity extends AppCompatActivity {
 			@Override
 			public void onClick(View v) {
 				Log.d("main", "upload clicked");
-				setProgressBarIndeterminateVisibility(true);
+				setProgressBarVisibility(true);
 				api.putItem(ocrText, ocrConfidence, ocrBitmap).subscribe(new Subscriber<Boolean>() {
 					@Override
 					public void onCompleted() {
-						setProgressBarIndeterminateVisibility(false);
+						setProgressBarVisibility(false);
 						Log.d("onCompleted()", "put item done");
 						showMainPanel();;
 					}
 
 					@Override
 					public void onError(Throwable e) {
-						setProgressBarIndeterminateVisibility(false);
+						showProgressBar(false);
 						showError("Error uploading data", e.getMessage());
 						showMainPanel();;
 
@@ -370,13 +374,13 @@ public class MainActivity extends AppCompatActivity {
 				Log.d("onStart()", "initial load done");
 				itemSetAdapter.clear();
 				itemSetAdapter.addAll(itemCache.getList());
-				setProgressBarIndeterminateVisibility(false);
+				showProgressBar(false);
 			}
 
 			@Override
 			public void onError(Throwable e) {
 				showError("Error making initial web requests", e.getMessage());
-				setProgressBarIndeterminateVisibility(false);
+				showProgressBar(false);
 			}
 
 			@Override public void onNext(Boolean aBoolean) { }
@@ -393,7 +397,7 @@ public class MainActivity extends AppCompatActivity {
 			@Override
 			public void call(Boolean aBoolean) {
 				itemSetAdapter.updateFrom(mCurrent, itemCache.getList());
-				setProgressBarIndeterminateVisibility(false);
+				showProgressBar(false);
 			}
 		}, onNetworkError);
 	}
@@ -408,7 +412,7 @@ public class MainActivity extends AppCompatActivity {
 			@Override
 			public void call(Boolean aBoolean) {
 				itemSetAdapter.updateFrom(mCurrent, itemCache.getList());
-				setProgressBarIndeterminateVisibility(false);
+				showProgressBar(false);
 			}
 		}, onNetworkError);
 	}
@@ -420,7 +424,7 @@ public class MainActivity extends AppCompatActivity {
 	 */
 	protected Observable<Boolean> fetchNextCatalogItems() {
 		String nextPage = itemCache.highestId;
-		setProgressBarIndeterminateVisibility(true);
+		showProgressBar(true);
 		return api.getItems(nextPage).map(new Func1<ArrayList<CatalogItem>, Boolean>() {
 			@Override
 			public Boolean call(ArrayList<CatalogItem> itemSet) {
@@ -457,10 +461,17 @@ public class MainActivity extends AppCompatActivity {
 	protected Action1<Throwable> onNetworkError = new Action1<Throwable>() {
 		@Override
 		public void call(Throwable e) {
-			setProgressBarIndeterminateVisibility(false);
+			showProgressBar(false);
 			showError("Error fetching next from server, ", e.getMessage());
 		}
 	};
+
+	private void showProgressBar(boolean b) {
+		this.setProgressBarIndeterminateVisibility(b);
+		if (progressBar != null) {
+			progressBar.setVisibility(b? View.VISIBLE: View.GONE);
+		}
+	}
 
 	/**
 	 * show an alert with the given title and message
