@@ -1,0 +1,77 @@
+package com.mayaswell.digident;
+
+import org.junit.Before;
+import org.junit.Test;
+
+import java.util.ArrayList;
+import java.util.Collection;
+
+import okhttp3.Request;
+
+import static org.junit.Assert.*;
+
+/**
+ * Created by dak on 9/29/2016.
+ */
+public class CatalogAPITest {
+
+	String testResponseData = "["+"{" +
+			"\"text\": \"28. uwasr\"," +
+			"\"confidence\": 0.46, " +
+// android Base64 isn't mocked for local testing .. needs to be run on a device
+//			"\"img\": \"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\", " +
+			"\"_id\": \"5787c49a3a033\" "+
+			"}"+"]";
+	protected CatalogAPI catalogAPI = null;
+	@Before
+	public void setUp() throws Exception {
+		catalogAPI = new CatalogAPI("https://marlove.net/mock/v1", "8894e4b60fb5aec440e45b0b6d615916", null);
+	}
+
+
+	@Test
+	public void testFetchRequest() throws Exception {
+		Request request = catalogAPI.itemRequest(null, null);
+		assertEquals(
+				"https://marlove.net/mock/v1/items",
+				request.url().toString());
+		assertEquals("GET", request.method());
+		assertEquals(null, request.body());
+		assertNotEquals(0, request.headers().size());
+		assertEquals("8894e4b60fb5aec440e45b0b6d615916", request.headers().get("Authorization"));
+
+		request = catalogAPI.itemRequest(null, "5787c49717eb4");
+		assertEquals(
+				"https://marlove.net/mock/v1/items?max_id=5787c49717eb4",
+				request.url().toString());
+		assertEquals("GET", request.method());
+		assertEquals(null, request.body());
+		assertNotEquals(0, request.headers().size());
+		assertEquals("8894e4b60fb5aec440e45b0b6d615916", request.headers().get("Authorization"));
+
+		request = catalogAPI.itemRequest("5787c49a3a033", null);
+		assertEquals(
+				"https://marlove.net/mock/v1/items?since_id=5787c49a3a033",
+				request.url().toString());
+		assertEquals("GET", request.method());
+		assertEquals(null, request.body());
+		assertNotEquals(0, request.headers().size());
+		assertEquals("8894e4b60fb5aec440e45b0b6d615916", request.headers().get("Authorization"));
+	}
+
+	@Test(expected = RuntimeException.class)
+	public void testNullParseCatalogItems() throws Exception {
+		Collection<CatalogAPI.CatalogItem> c = catalogAPI.parseCatalogItems(null);
+	}
+
+
+	@Test
+	public void testParseCatalogItems() throws Exception {
+		ArrayList<CatalogAPI.CatalogItem> c = catalogAPI.parseCatalogItems(testResponseData);
+		assertNotNull(c);
+		assertEquals(1, c.size());
+		assertEquals("5787c49a3a033", c.get(0).id);
+		assertEquals("28. uwasr", c.get(0).text);
+		assertEquals(0.46, c.get(0).confidence, 0.0001);
+	}
+}

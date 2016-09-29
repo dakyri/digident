@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">Digident</string>
+    <string name="apiUrl">https://marlove.net/mock/v1</string>
+    <string name="apiKey">8894e4b60fb5aec440e45b0b6d615916</string>
+    <string name="title_new_item">New Item</string>
+    <string name="upload_item">Upload</string>
+</resources>
